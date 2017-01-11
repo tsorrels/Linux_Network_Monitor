@@ -16,10 +16,11 @@ struct State{
     
     WINDOW * scrn;
 
+    int curline;
     int currow;
     int numlines;
 
-    char ** lineoutput;
+    char lineoutput[MAXROW][MAXCOL];
     
 };
 
