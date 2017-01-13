@@ -56,8 +56,7 @@ void boldline(){
     attron(A_BOLD);
     mvaddstr(state.currow, 0, state.lineoutput[state.curline]);
     attroff(A_BOLD);
-    //refresh();
-
+    move(state.currow, 0);
 }
 
 void writeheader(){
@@ -69,14 +68,23 @@ void writeheader(){
 void writelines(){
 
     int row;
+    int startrow;
     int linenum;
+    int startline;
 
-    for (row = state.header.numrows, linenum = 0 ; linenum < state.numlines ;
-	 row ++, linenum ++){
+    startline = state.curline - state.currow - state.header.numrows;
+    if (startline < 0) startline = 0;
+    
+    for (row = state.header.numrows, linenum = startline ;
+	 linenum < state.numlines ; row ++, linenum ++){
 	//printf("%s\n", state.lineoutput[row]);
 	mvaddstr(row, 0, state.lineoutput[linenum]);
 	//if (row == LINES) break;
     }
+
+    /* if list shrank, ensure currow is not greater than list size */
+    if (state.currow > row) state.currow = row;
+    
 }
 
 
@@ -105,7 +113,8 @@ void runnetstat(){
 	state.lineoutput[row][MAXCOL-1] = 0; /* remove newline character */
 	                                     /* add null terminator */
     }
-    state.numlines = row + 1;
+    //state.numlines = row + 1;
+    state.numlines = row;
     //if (state.numlines == MAXROW)
     //perror("Error: netstat output exceeded MAXROW");    
 
@@ -114,25 +123,31 @@ void runnetstat(){
 
 void movecursor(int delta){
     int newrow;
+    int newline;
     
     newrow = state.currow + delta;
-    //if (state.curline == state.numlines - 1 || state.curline == 0 ) return;
+    newline = state.curline + delta;
+    if (newline >= state.numlines || newline < 0 ) return;
 
     
-    if (state.currow == LINES){
-	
+    if (newrow > LINES){
+	state.curline = newline;
+	display();
 	//redraw
     }
 	
-    else if (state.currow == state.header.numrows){
+    else if (newrow < state.header.numrows){
 	//redraw
+	state.curline = newline;
+	display();
     
     }
 
     else{
+	/* first, unbold current line */
 	mvaddstr(state.currow, 0, state.lineoutput[state.curline]);	
-	state.curline += delta;
-	state.currow += delta;
+	state.curline = newline;
+	state.currow = newrow;
 	boldline();
 	
     }
@@ -152,8 +167,6 @@ void handleinput()
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
     else if (input == KEY_DOWN) movecursor(-1);
-
-    printf("input = %i\n", input);
 
 
 
@@ -188,13 +201,7 @@ int main(int argc, char** argv)
 	}
 
 	else{
-	    //runnetstat();
-	    //clear();
-	    //refresh();
-	    //writeheader();
-	    //refresh();
 	    display();
-	    //refresh();
 	    timeout.tv_sec = 2;
 	    timeout.tv_usec = 0;
 
