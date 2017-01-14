@@ -72,7 +72,7 @@ void writelines(){
     int linenum;
     int startline;
 
-    startline = state.curline - state.currow - state.header.numrows;
+    startline = state.curline - state.currow + state.header.numrows;
     if (startline < 0) startline = 0;
     
     for (row = state.header.numrows, linenum = startline ;
@@ -91,7 +91,7 @@ void writelines(){
 void display(){
 
     clear();
-    runnetstat();
+    //runnetstat();
     writeheader();
     writelines();
     boldline();
@@ -113,10 +113,7 @@ void runnetstat(){
 	state.lineoutput[row][MAXCOL-1] = 0; /* remove newline character */
 	                                     /* add null terminator */
     }
-    //state.numlines = row + 1;
     state.numlines = row;
-    //if (state.numlines == MAXROW)
-    //perror("Error: netstat output exceeded MAXROW");    
 
     pclose(pipe);    
 }
@@ -130,7 +127,8 @@ void movecursor(int delta){
     if (newline >= state.numlines || newline < 0 ) return;
 
     
-    if (newrow > LINES){
+    if (newrow >= LINES){
+	//quit(0);
 	state.curline = newline;
 	display();
 	//redraw
@@ -139,8 +137,7 @@ void movecursor(int delta){
     else if (newrow < state.header.numrows){
 	//redraw
 	state.curline = newline;
-	display();
-    
+	display();    
     }
 
     else{
@@ -149,9 +146,8 @@ void movecursor(int delta){
 	state.curline = newline;
 	state.currow = newrow;
 	boldline();
-	
+	refresh();
     }
-    refresh();
 }
 
 
@@ -159,7 +155,6 @@ void movecursor(int delta){
 void handleinput()
 {
     char input;
-    //printf("test\n");
     input = getch();
     if (input == 'q') quit(0);
     
@@ -183,6 +178,7 @@ int main(int argc, char** argv)
     
     initialize();
 
+    runnetstat();
     display();
     
     FD_ZERO( &mask );
@@ -201,6 +197,7 @@ int main(int argc, char** argv)
 	}
 
 	else{
+	    runnetstat();
 	    display();
 	    timeout.tv_sec = 2;
 	    timeout.tv_usec = 0;
