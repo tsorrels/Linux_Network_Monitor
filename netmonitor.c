@@ -1,16 +1,14 @@
 /* Idea borrowed from Norman Matloff, UC Davis */
 
-
-
-
+#include <sys/types.h>
 #include <curses.h>
 #include "netmonitor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 struct State state;
 void quit(int status);
@@ -20,7 +18,11 @@ void writelines();
 void runnetstat();
 void boldtext();
 void killprocess();
-int parsepid();
+pid_t parsepid();
+void sendkill();
+void display();
+void clearmessage();
+
 
 void initialize(){
 
@@ -54,24 +56,70 @@ void writeheader(){
     mvaddstr(0, 0, "netmonitor v1.0\n\n");
 }
 
+void clearmessage(){
 
-int parsepid(){
-    
-
-    return;
+    mvaddstr(4, 0, "");
 }
 
-void killprocess(){
-    /* get PID */
+void writemessage( char * message){
+    mvaddstr(4, 0, message);
+    refresh();
+}
 
 
-    return;
+pid_t parsepid(){
+    char tokenline[MAXCOL];
+    char pidname[30];
+    char pid[10];
+    /* char name[20]; */
+    char * cptr;
+    
+    strncpy(tokenline, state.lineoutput[state.curline], MAXCOL);    
+    cptr = strtok(tokenline, " \t\n");    
+    while (cptr != NULL){
+	strncpy(pidname, cptr, 25);
+	cptr = strtok(NULL, " \t\n");	
+    }
+
+    cptr = strtok(pidname, "/");
+    strncpy(pid, cptr, 10);
+
+    if (strcmp(pid, "/") == 0) return (pid_t) 0;
+
+    return (pid_t) atoi(pid);
+}
+
+/* checks if state indicates a PID for a process selected for kill; if PID != 0
+   then send SIGKILL and reset state.pidkill to 0 */
+void sendkill(){
+    
+    if (state.pidkill != 0) kill(state.pidkill, SIGKILL);
+    state.pidkill = 0;
+    clearmessage();
+    runnetstat();
+    display();
+}
+
+void killprocess(){    
+    pid_t pid;
+    char message [100];
+
+    pid = parsepid();
+
+    if (pid == 0){
+	writemessage("Cannot kill this process - rerun program as root");
+    }
+
+    else{
+	snprintf(message, 100, "Kill process PID %u? (Y/n)", pid);
+	writemessage(message);
+	state.pidkill = pid;
+    }
 }
 
 void writelines(){
 
     int row;
-    int startrow;
     int linenum;
     int startline;
 
@@ -81,7 +129,7 @@ void writelines(){
     for (row = state.header.numrows, linenum = startline ;
 	 linenum < state.numlines ; row ++, linenum ++){
 	mvaddstr(row, 0, state.lineoutput[linenum]);
-	//if (row == LINES) break;
+	/* if (row == LINES) break; */
     }
 
     /* if list shrank, ensure currow is not greater than list size */
@@ -161,6 +209,8 @@ void handleinput()
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
     //else if (input == KEY_DOWN) movecursor(-1);
+    else if (input == 'Y' && state.pidkill != 0) sendkill();
+
 }
 
 
