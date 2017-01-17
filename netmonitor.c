@@ -13,14 +13,14 @@
 #include <unistd.h>
 
 struct State state;
-
 void quit(int status);
 void initialize();
 void writeheader();
 void writelines();
 void runnetstat();
 void boldtext();
-
+void killprocess();
+int parsepid();
 
 void initialize(){
 
@@ -29,11 +29,6 @@ void initialize(){
     state.header.numrows = 5;
     state.currow = state.header.numrows;
     state.curline = 0;
-    /*state.lineoutput = malloc(MAXROW * MAXCOL * sizeof(char));
-    if (state.lineoutput == NULL){
-	perror("Error: failed to allocate memory for netstat output");
-	quit(1);
-	}*/
     
     noecho();
     cbreak();
@@ -42,13 +37,8 @@ void initialize(){
 }
 
 void quit(int status){
-
-    //if (state.lineoutput != NULL) free(state.lineoutput);
-
     endwin();
-
     exit(status);
-
 }
 
 
@@ -65,6 +55,19 @@ void writeheader(){
 }
 
 
+int parsepid(){
+    
+
+    return;
+}
+
+void killprocess(){
+    /* get PID */
+
+
+    return;
+}
+
 void writelines(){
 
     int row;
@@ -77,7 +80,6 @@ void writelines(){
     
     for (row = state.header.numrows, linenum = startline ;
 	 linenum < state.numlines ; row ++, linenum ++){
-	//printf("%s\n", state.lineoutput[row]);
 	mvaddstr(row, 0, state.lineoutput[linenum]);
 	//if (row == LINES) break;
     }
@@ -91,7 +93,6 @@ void writelines(){
 void display(){
 
     clear();
-    //runnetstat();
     writeheader();
     writelines();
     boldline();
@@ -128,14 +129,11 @@ void movecursor(int delta){
 
     
     if (newrow >= LINES){
-	//quit(0);
 	state.curline = newline;
 	display();
-	//redraw
     }
 	
     else if (newrow < state.header.numrows){
-	//redraw
 	state.curline = newline;
 	display();    
     }
@@ -157,14 +155,12 @@ void handleinput()
     char input;
     input = getch();
     if (input == 'q') quit(0);
-    
-    else if (input == KEY_UP) movecursor(1);
+ 
+    else if (input == 'k') killprocess();
+    //else if (input == KEY_UP) movecursor(1);
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
-    else if (input == KEY_DOWN) movecursor(-1);
-
-
-
+    //else if (input == KEY_DOWN) movecursor(-1);
 }
 
 
@@ -175,7 +171,6 @@ int main(int argc, char** argv)
     struct timeval timeout;
     int numfds;
 
-    
     initialize();
 
     runnetstat();
@@ -201,11 +196,11 @@ int main(int argc, char** argv)
 	    display();
 	    timeout.tv_sec = 2;
 	    timeout.tv_usec = 0;
-
 	}
     }
     
-    //quit(0);
+    quit(0);
 
+    /* never reached */
     return 0;
 }
