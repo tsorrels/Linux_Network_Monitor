@@ -7,6 +7,8 @@
 struct Header{
     int numrows;
 
+    char message[MAXCOL];
+
 };
 
 

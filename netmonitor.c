@@ -1,5 +1,4 @@
-/* Idea borrowed from Norman Matloff, UC Davis */
-
+/* */
 #include <sys/types.h>
 #include <curses.h>
 #include "netmonitor.h"
@@ -54,14 +53,22 @@ void boldline(){
 void writeheader(){
 
     mvaddstr(0, 0, "netmonitor v1.0\n\n");
+    mvaddstr(state.header.numrows - 1, 0, state.header.message);
 }
 
 void clearmessage(){
+    int i;
 
-    mvaddstr(4, 0, "");
+    state.header.message[0] = '\0';
+    for (i = 0 ; i < COLS ; i ++){
+	mvaddch(state.header.numrows - 1, i, ' ');
+
+    }
+    refresh();
 }
 
 void writemessage( char * message){
+    strncpy(state.header.message, message, MAXCOL);
     mvaddstr(4, 0, message);
     refresh();
 }
@@ -133,8 +140,9 @@ void writelines(){
     }
 
     /* if list shrank, ensure currow is not greater than list size */
-    if (state.currow > row) state.currow = row;
-    
+    //if (state.currow > row) 
+    //state.currow = row;
+
 }
 
 
@@ -163,6 +171,12 @@ void runnetstat(){
 	                                     /* add null terminator */
     }
     state.numlines = row;
+    if (state.curline >= state.numlines) 
+	state.curline = state.numlines - 1;
+
+    if (state.currow >= row + state.header.numrows) 
+	state.currow = row + state.header.numrows - 1;
+
 
     pclose(pipe);    
 }
@@ -173,10 +187,13 @@ void movecursor(int delta){
     
     newrow = state.currow + delta;
     newline = state.curline + delta;
-    if (newline >= state.numlines || newline < 0 ) return;
+    if (newline >= state.numlines || newline < 0 ) {
+	return;
+	move(state.currow, 0);
+	quit(0);
+    }    
 
-    
-    if (newrow >= LINES){
+    else if (newrow >= LINES){
 	state.curline = newline;
 	display();
     }
@@ -201,14 +218,14 @@ void movecursor(int delta){
 void handleinput()
 {
     char input;
-    input = getch();
-    if (input == 'q') quit(0);
  
+    clearmessage();
+    input = getch();
+
+    if (input == 'q') quit(0); 
     else if (input == 'k') killprocess();
-    //else if (input == KEY_UP) movecursor(1);
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
-    //else if (input == KEY_DOWN) movecursor(-1);
     else if (input == 'Y' && state.pidkill != 0) sendkill();
 
 }
