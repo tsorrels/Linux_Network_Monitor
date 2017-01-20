@@ -7,6 +7,8 @@
 struct Header{
     int numrows;
 
+    char message[MAXCOL];
+
 };
 
 
@@ -21,7 +23,7 @@ struct State{
     int numlines;
 
     char lineoutput[MAXROW][MAXCOL];
-    
+  
+    pid_t pidkill;
+  
 };
-
-

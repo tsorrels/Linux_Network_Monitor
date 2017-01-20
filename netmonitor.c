@@ -1,25 +1,26 @@
-/* Idea borrowed from Norman Matloff, UC Davis */
-
-
-
-
+/* */
+#include <sys/types.h>
 #include <curses.h>
 #include "netmonitor.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/select.h>
-#include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 struct State state;
-
 void quit(int status);
 void initialize();
 void writeheader();
 void writelines();
 void runnetstat();
 void boldtext();
+void killprocess();
+pid_t parsepid();
+void sendkill();
+void display();
+void clearmessage();
 
 
 void initialize(){
@@ -29,11 +30,6 @@ void initialize(){
     state.header.numrows = 5;
     state.currow = state.header.numrows;
     state.curline = 0;
-    /*state.lineoutput = malloc(MAXROW * MAXCOL * sizeof(char));
-    if (state.lineoutput == NULL){
-	perror("Error: failed to allocate memory for netstat output");
-	quit(1);
-	}*/
     
     noecho();
     cbreak();
@@ -42,13 +38,8 @@ void initialize(){
 }
 
 void quit(int status){
-
-    //if (state.lineoutput != NULL) free(state.lineoutput);
-
     endwin();
-
     exit(status);
-
 }
 
 
@@ -62,13 +53,80 @@ void boldline(){
 void writeheader(){
 
     mvaddstr(0, 0, "netmonitor v1.0\n\n");
+    mvaddstr(state.header.numrows - 1, 0, state.header.message);
 }
 
+void clearmessage(){
+    int i;
+
+    state.header.message[0] = '\0';
+    for (i = 0 ; i < COLS ; i ++){
+	mvaddch(state.header.numrows - 1, i, ' ');
+
+    }
+    refresh();
+}
+
+void writemessage( char * message){
+    strncpy(state.header.message, message, MAXCOL);
+    mvaddstr(4, 0, message);
+    refresh();
+}
+
+
+pid_t parsepid(){
+    char tokenline[MAXCOL];
+    char pidname[30];
+    char pid[10];
+    /* char name[20]; */
+    char * cptr;
+    
+    strncpy(tokenline, state.lineoutput[state.curline], MAXCOL);    
+    cptr = strtok(tokenline, " \t\n");    
+    while (cptr != NULL){
+	strncpy(pidname, cptr, 25);
+	cptr = strtok(NULL, " \t\n");	
+    }
+
+    cptr = strtok(pidname, "/");
+    strncpy(pid, cptr, 10);
+
+    if (strcmp(pid, "/") == 0) return (pid_t) 0;
+
+    return (pid_t) atoi(pid);
+}
+
+/* checks if state indicates a PID for a process selected for kill; if PID != 0
+   then send SIGKILL and reset state.pidkill to 0 */
+void sendkill(){
+    
+    if (state.pidkill != 0) kill(state.pidkill, SIGKILL);
+    state.pidkill = 0;
+    clearmessage();
+    runnetstat();
+    display();
+}
+
+void killprocess(){    
+    pid_t pid;
+    char message [100];
+
+    pid = parsepid();
+
+    if (pid == 0){
+	writemessage("Cannot kill this process - rerun program as root");
+    }
+
+    else{
+	snprintf(message, 100, "Kill process PID %u? (Y/n)", pid);
+	writemessage(message);
+	state.pidkill = pid;
+    }
+}
 
 void writelines(){
 
     int row;
-    int startrow;
     int linenum;
     int startline;
 
@@ -77,21 +135,20 @@ void writelines(){
     
     for (row = state.header.numrows, linenum = startline ;
 	 linenum < state.numlines ; row ++, linenum ++){
-	//printf("%s\n", state.lineoutput[row]);
 	mvaddstr(row, 0, state.lineoutput[linenum]);
-	//if (row == LINES) break;
+	/* if (row == LINES) break; */
     }
 
     /* if list shrank, ensure currow is not greater than list size */
-    if (state.currow > row) state.currow = row;
-    
+    //if (state.currow > row) 
+    //state.currow = row;
+
 }
 
 
 void display(){
 
     clear();
-    //runnetstat();
     writeheader();
     writelines();
     boldline();
@@ -114,6 +171,12 @@ void runnetstat(){
 	                                     /* add null terminator */
     }
     state.numlines = row;
+    if (state.curline >= state.numlines) 
+	state.curline = state.numlines - 1;
+
+    if (state.currow >= row + state.header.numrows) 
+	state.currow = row + state.header.numrows - 1;
+
 
     pclose(pipe);    
 }
@@ -124,18 +187,18 @@ void movecursor(int delta){
     
     newrow = state.currow + delta;
     newline = state.curline + delta;
-    if (newline >= state.numlines || newline < 0 ) return;
+    if (newline >= state.numlines || newline < 0 ) {
+	return;
+	move(state.currow, 0);
+	quit(0);
+    }    
 
-    
-    if (newrow >= LINES){
-	//quit(0);
+    else if (newrow >= LINES){
 	state.curline = newline;
 	display();
-	//redraw
     }
 	
     else if (newrow < state.header.numrows){
-	//redraw
 	state.curline = newline;
 	display();    
     }
@@ -155,15 +218,15 @@ void movecursor(int delta){
 void handleinput()
 {
     char input;
+ 
+    clearmessage();
     input = getch();
-    if (input == 'q') quit(0);
-    
-    else if (input == KEY_UP) movecursor(1);
+
+    if (input == 'q') quit(0); 
+    else if (input == 'k') killprocess();
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
-    else if (input == KEY_DOWN) movecursor(-1);
-
-
+    else if (input == 'Y' && state.pidkill != 0) sendkill();
 
 }
 
@@ -175,7 +238,6 @@ int main(int argc, char** argv)
     struct timeval timeout;
     int numfds;
 
-    
     initialize();
 
     runnetstat();
@@ -201,11 +263,11 @@ int main(int argc, char** argv)
 	    display();
 	    timeout.tv_sec = 2;
 	    timeout.tv_usec = 0;
-
 	}
     }
     
-    //quit(0);
+    quit(0);
 
+    /* never reached */
     return 0;
 }
