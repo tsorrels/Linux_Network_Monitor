@@ -27,7 +27,7 @@ void initialize(){
 
     state.scrn = initscr();
     
-    state.header.numrows = 5;
+    state.header.numrows = NUMHEADROWS;
     state.currow = state.header.numrows;
     state.curline = 0;
     
@@ -50,9 +50,53 @@ void boldline(){
     move(state.currow, 0);
 }
 
-void writeheader(){
+void writestats(){
+    int i;
+    char * cptr;
+    char tokenline[MAXCOL];
+    int row;
+    char outline[MAXCOL];
+    char interface[8];
+    char bytesin[8];
+    char bytesout[8];
+    int outputrow;
 
-    mvaddstr(0, 0, "netmonitor v1.0\n\n");
+    outputrow = 2; /* skip first three rows of cat output */
+    row = 2; /* skip to second row on screen */
+
+
+    for ( ; row < NUMHEADROWS ; row ++, outputrow ++){
+	if (state.header.netdevoutput[outputrow][0] == '\0') break;
+	strncpy(tokenline, state.header.netdevoutput[outputrow], MAXCOL);
+
+	/* write interface */
+	cptr = strtok(tokenline, " \t\n");
+	strncpy(interface, cptr, 8);
+
+	/* write received bytes */
+	cptr = strtok(NULL, " \t\n");
+	strncpy(bytesin, cptr, 8);
+
+	/* skip other statistics */
+	for (i = 0 ; i < 8 ; i ++) cptr = strtok(NULL,  " \t\n");
+
+	/* write received bytes */
+	strncpy(bytesout, cptr, 8);    
+
+	/* build string */
+	snprintf(outline,MAXCOL,"%s\t\t%s\t\t%s", interface,bytesin, bytesout);
+
+	mvaddstr(row, 0, outline);
+
+    }
+}
+
+void writeheader(){
+    attron(A_STANDOUT);
+    mvaddstr(0, 0, "netmonitor v1.0");
+    attroff(A_STANDOUT);
+    mvaddstr(1, 0, "Interface\tBytes Rx\tBytes Tx");
+    writestats();
     mvaddstr(state.header.numrows - 1, 0, state.header.message);
 }
 
@@ -138,11 +182,6 @@ void writelines(){
 	mvaddstr(row, 0, state.lineoutput[linenum]);
 	/* if (row == LINES) break; */
     }
-
-    /* if list shrank, ensure currow is not greater than list size */
-    //if (state.currow > row) 
-    //state.currow = row;
-
 }
 
 
@@ -154,6 +193,26 @@ void display(){
     boldline();
     refresh();
 }
+
+void readnetdev(){
+    FILE * pipe;
+    char line[MAXCOL];
+    int row;
+    char * tmp;
+
+    pipe = popen("cat /proc/net/dev 2>/dev/null", "r");
+    
+    for (row = 0 ; row < NUMHEADROWS + 2 ; row ++){
+	tmp = fgets(line, MAXCOL, pipe);
+	if (tmp == NULL) break;
+	strncpy(state.header.netdevoutput[row], line, COLS);
+	state.header.netdevoutput[row][MAXCOL-1] = 0; /* remove \n */
+	                                              /* add null terminator */
+    }
+
+    pclose(pipe);    
+}
+
 
 void runnetstat(){
     FILE * pipe;
@@ -240,6 +299,8 @@ int main(int argc, char** argv)
 
     initialize();
 
+
+    readnetdev();
     runnetstat();
     display();
     
@@ -259,7 +320,8 @@ int main(int argc, char** argv)
 	}
 
 	else{
-	    runnetstat();
+	    readnetdev();
+	    runnetstat();	    
 	    display();
 	    timeout.tv_sec = 2;
 	    timeout.tv_usec = 0;

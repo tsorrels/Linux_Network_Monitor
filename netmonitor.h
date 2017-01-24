@@ -2,10 +2,12 @@
 
 #define MAXROW 1000
 #define MAXCOL 500
-
+#define NUMHEADROWS 5
 
 struct Header{
     int numrows;
+
+    char netdevoutput[NUMHEADROWS + 2][MAXCOL];
 
     char message[MAXCOL];
 
