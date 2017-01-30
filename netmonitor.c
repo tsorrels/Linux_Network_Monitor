@@ -144,7 +144,10 @@ pid_t parsepid(){
    then send SIGKILL and reset state.pidkill to 0 */
 void sendkill(){
     
-    if (state.pidkill != 0) kill(state.pidkill, SIGKILL);
+    if (state.pidkill != 0){
+	
+	kill(state.pidkill, SIGKILL);
+    }
     state.pidkill = 0;
     clearmessage();
     runnetstat();
