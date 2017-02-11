@@ -143,11 +143,24 @@ pid_t parsepid(){
 /* checks if state indicates a PID for a process selected for kill; if PID != 0
    then send SIGKILL and reset state.pidkill to 0 */
 void sendkill(){
+    int checkerror;
+
     
-    if (state.pidkill != 0){
-	
-	kill(state.pidkill, SIGKILL);
+    /* verify the state contains a 'current' PID to kill */
+    if (state.pidkill == 0) return;
+
+    /* check if managed by systemd */
+    if ( ismanaged(state.pidkill) ){
+	checkerror = stopservice(state.pidkill);
+	/* if (checkerror < 0) */
+	    /* handle error */
+		
     }
+		
+    /* if not managed, send SIGKILL */
+    else kill(state.pidkill, SIGKILL);
+    
+    
     state.pidkill = 0;
     clearmessage();
     runnetstat();
@@ -172,7 +185,6 @@ void killprocess(){
 }
 
 void writelines(){
-
     int row;
     int linenum;
     int startline;

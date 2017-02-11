@@ -29,3 +29,7 @@ struct State{
     pid_t pidkill;
   
 };
+
+
+int ismanaged(pid_t pid);
+int stopservice(pid_t pid);
