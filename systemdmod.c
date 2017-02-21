@@ -4,10 +4,15 @@
 #include <curses.h>
 #include "netmonitor.h"
 
+char servicename[80];
+
+
 int ismanaged(pid_t pid){
-
-
-    return 1;
+    int checkerror;
+    
+    checkerror = getservicename(pid);
+    if (checkerror == 0) return 1;
+    else return 0;
 }
 
 
@@ -23,14 +28,16 @@ int isactive(pid_t pid){
 }
 
 
-int getservicename(pid_t pid, char * name){
-    char servicename[80];
+int getservicename(pid_t pid){
     int checkerror;
     char cmdstring[80];
     FILE * pipe;
     char line[MAXCOL];
     char * tmp;
     char * cptr;
+
+    /* clear name in buffer */
+    servicename[0] = '\0';
     
     snprintf(cmdstring, 80, "systemctl status %u", pid);
     pipe = popen(cmdstring, "r");
@@ -43,6 +50,13 @@ int getservicename(pid_t pid, char * name){
     tmp = fgets(line, MAXCOL, pipe);
     if (tmp == NULL) return -1;
 
+    checkerror = pclose(pipe);
+    if (checkerror == 1){
+	/* handle error */
+	return ERRSYSDNAME;
+    }
+    
+    
     /* point to dot character */
     cptr = strtok(line, " ");
     if (cptr == NULL){
@@ -57,22 +71,34 @@ int getservicename(pid_t pid, char * name){
 	return -1;
     }
 
-    strncpy(name, cptr, 80);        
+    strncpy(servicename, cptr, 80);        
+
+    /* ensure this is a service */
+    /* point first to name */
+    cptr = strtok(cptr, ".");
+    if (cptr == NULL){
+	/* handle error */
+	return -1;
+    }
+
+    /* now point to "service", "scope", or "slice" */
+    cptr = strtok(NULL, "\n\0");
+    if(strcmp (cptr, "service") != 0) return -1;
     
-    return 1;
+    return 0;
 }
 
 
 int stopservice(pid_t pid){
-    char servicename[80];
+    //char servicename[80];
     int checkerror;
     char cmdstring[80];
     FILE * pipe;
 
-    checkerror = getservicename(pid, servicename);
+    checkerror = getservicename(pid);
     if (checkerror < 0){
 	/* handle error */
-	return -1;
+	return ERRSYSDNAME;
     }
 
     /* exec systemctl disable SERVICENAME */
@@ -80,7 +106,7 @@ int stopservice(pid_t pid){
     pipe = popen(cmdstring, "r");
     if (pipe == NULL){
 	/* handle error */
-	return -1;
+	return ERRSYSDSTOP;
     }
 
     checkerror = pclose(pipe);
@@ -89,18 +115,17 @@ int stopservice(pid_t pid){
 	return -1;
     }
     
-    return 1;
+    return 0;
 }
 
 
 
 int disableunit(pid_t pid){
-    char servicename[80];
     int checkerror;
     char cmdstring[80];
     FILE * pipe;
     
-    checkerror = getservicename(pid, servicename);
+    checkerror = getservicename(pid);
     if (checkerror < 0){
 	/* handle error */
 	return -1;
