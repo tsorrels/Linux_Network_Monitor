@@ -1,6 +1,6 @@
 /* */
-#include <sys/types.h>
-#include <curses.h>
+//#include <sys/types.h>
+//#include <curses.h>
 #include "netmonitor.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +30,8 @@ void initialize(){
     state.header.numrows = NUMHEADROWS;
     state.currow = state.header.numrows;
     state.curline = 0;
+    state.paused = 0;
+    openlog();
     
     noecho();
     cbreak();
@@ -39,6 +41,7 @@ void initialize(){
 
 void quit(int status){
     endwin();
+    closelog();
     exit(status);
 }
 
@@ -63,7 +66,6 @@ void writestats(){
 
     outputrow = 2; /* skip first three rows of cat output */
     row = 2; /* skip to second row on screen */
-
 
     for ( ; row < NUMHEADROWS ; row ++, outputrow ++){
 	if (state.header.netdevoutput[outputrow][0] == '\0') break;
@@ -95,6 +97,9 @@ void writeheader(){
     attron(A_STANDOUT);
     mvaddstr(0, 0, "netmonitor v1.0");
     attroff(A_STANDOUT);
+    if (state.paused == 1)
+	mvaddstr(0, 15, " - paused");
+    
     mvaddstr(1, 0, "Interface\tBytes Rx\tBytes Tx");
     writestats();
     mvaddstr(state.header.numrows - 1, 0, state.header.message);
@@ -143,8 +148,47 @@ pid_t parsepid(){
 /* checks if state indicates a PID for a process selected for kill; if PID != 0
    then send SIGKILL and reset state.pidkill to 0 */
 void sendkill(){
+    int checkerror;
+
     
-    if (state.pidkill != 0) kill(state.pidkill, SIGKILL);
+    /* verify the state contains a 'current' PID to kill */
+    if (state.pidkill == 0){
+	writelog(1, "User sent kill, but no target PID stored in state\n");
+	return;
+    }
+    /* check if managed by systemd */
+    if ( ismanaged(state.pidkill) ){
+	checkerror = stopservice(state.pidkill);
+	/* if (checkerror < 0) */
+	    /* handle error */
+	switch(checkerror)
+	{
+	case ERRSYSDSTOP:
+	    snprintf(state.logbuffer, SIZELOGBUF,
+		 "systemd failed to stop service with PID %u", state.pidkill);
+	    writelog(1, state.logbuffer);
+	    break;
+	case ERRSYSDNAME:
+
+	    break;
+
+	default:
+	    snprintf(state.logbuffer, SIZELOGBUF,
+		 "stopped systemd managed service with PID %u", state.pidkill);
+	    writelog(1, state.logbuffer);
+	    break;
+	    
+	}		
+    }
+		
+    /* if not managed, send SIGKILL */
+    else {
+	snprintf(state.logbuffer, SIZELOGBUF,
+		 "Killing process %u using SIGKILL", state.pidkill);
+	writelog(1, state.logbuffer);	
+	kill(state.pidkill, SIGKILL);
+	
+    }
     state.pidkill = 0;
     clearmessage();
     runnetstat();
@@ -169,7 +213,6 @@ void killprocess(){
 }
 
 void writelines(){
-
     int row;
     int linenum;
     int startline;
@@ -272,7 +315,17 @@ void movecursor(int delta){
     }
 }
 
+void togglepause(){
 
+    if (state.paused == 0){
+	state.paused = 1;
+	writeheader();
+	refresh();
+    }
+    else if (state.paused == 1) state.paused = 0;
+    else writelog(1, "Error toggling pause\n");
+
+}
 
 void handleinput()
 {
@@ -286,7 +339,8 @@ void handleinput()
     else if (input == 2) movecursor(1);
     else if (input == 3) movecursor(-1);
     else if (input == 'Y' && state.pidkill != 0) sendkill();
-
+    else if (input == 'p') togglepause();
+    
 }
 
 
@@ -320,6 +374,7 @@ int main(int argc, char** argv)
 	}
 
 	else{
+	    if (state.paused == 1) continue;
 	    readnetdev();
 	    runnetstat();	    
 	    display();

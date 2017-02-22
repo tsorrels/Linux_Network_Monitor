@@ -5,12 +5,13 @@ CFLAGS = -g -c -Wall -pedantic
 
 all: netmonitor
 
-netmonitor: netmonitor.o
-	    $(CC) -o netmonitor netmonitor.o -lncurses
+netmonitor: netmonitor.o systemdmod.o log.o
+	    $(CC) -o netmonitor netmonitor.o systemdmod.o log.o -lncurses
 
 
 clean:
 	rm *.o
+	rm *.log
 	rm netmonitor
 
 %.o:    %.c
