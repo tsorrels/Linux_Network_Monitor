@@ -38,8 +38,6 @@ struct State{
 };
 
 
-#define LOGERROR "Error"
-
 
 #define ERRSYSDSTOP 1
 #define ERRSYSDNAME 2
@@ -47,6 +45,10 @@ struct State{
 #define ERROS 1
 
 #define MAXLOG 200
+
+#define LOGERROR 0
+#define LOGEVENT 1
+
 
 int ismanaged(pid_t pid);
 int stopservice(pid_t pid);

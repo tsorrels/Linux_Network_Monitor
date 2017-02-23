@@ -153,7 +153,8 @@ void sendkill(){
     
     /* verify the state contains a 'current' PID to kill */
     if (state.pidkill == 0){
-	writelog(1, "User sent kill, but no target PID stored in state\n");
+	writelog(LOGERROR,
+		 "User sent kill, but no target PID stored in state\n");
 	return;
     }
     /* check if managed by systemd */
@@ -166,7 +167,7 @@ void sendkill(){
 	case ERRSYSDSTOP:
 	    snprintf(state.logbuffer, SIZELOGBUF,
 		 "systemd failed to stop service with PID %u", state.pidkill);
-	    writelog(1, state.logbuffer);
+	    writelog(LOGERROR, state.logbuffer);
 	    break;
 	case ERRSYSDNAME:
 
@@ -175,7 +176,7 @@ void sendkill(){
 	default:
 	    snprintf(state.logbuffer, SIZELOGBUF,
 		 "stopped systemd managed service with PID %u", state.pidkill);
-	    writelog(1, state.logbuffer);
+	    writelog(LOGEVENT, state.logbuffer);
 	    break;
 	    
 	}		
@@ -185,7 +186,7 @@ void sendkill(){
     else {
 	snprintf(state.logbuffer, SIZELOGBUF,
 		 "Killing process %u using SIGKILL", state.pidkill);
-	writelog(1, state.logbuffer);	
+	writelog(LOGEVENT, state.logbuffer);	
 	kill(state.pidkill, SIGKILL);
 	
     }
@@ -323,7 +324,7 @@ void togglepause(){
 	refresh();
     }
     else if (state.paused == 1) state.paused = 0;
-    else writelog(1, "Error toggling pause\n");
+    else writelog(LOGERROR, "Error toggling pause\n");
 
 }
 

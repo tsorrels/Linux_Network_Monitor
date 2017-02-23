@@ -2,11 +2,14 @@
 #include <stdio.h>
 #include "netmonitor.h"
 #include <time.h>
+#include <string.h>
 
 FILE * filehandle;
 time_t rawtime;
 struct tm * timeinfo;
 char timebuffer[SIZETIMEBUF];
+
+#define SIZETYPE 10
 
 int openlog(){
 
@@ -20,11 +23,28 @@ int openlog(){
 
 int writelog(int type, char* message){
 //24
+    char logtype[SIZETYPE];
     /* print time, event type, and message */
+    switch(type)
+    {
+    case LOGERROR:
+	strncpy(logtype, "error", SIZETYPE);
+	break;
+
+    case LOGEVENT:
+	strncpy(logtype, "event", SIZETYPE);
+	break;
+
+    default:
+	strncpy(logtype, "unknown", SIZETYPE);
+	break;
+    }
+
+    
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     strftime(timebuffer, SIZETIMEBUF, "%D %T", timeinfo);
-    fprintf(filehandle, "%s, %s\n", timebuffer, message);
+    fprintf(filehandle, "%s, %s, %s\n", timebuffer, logtype, message);
     
     return 0;
 }
