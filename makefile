@@ -6,7 +6,7 @@ CFLAGS = -g -c -Wall -pedantic
 all: netmonitor
 
 netmonitor: netmonitor.o systemdmod.o log.o
-	    $(CC) -o netmonitor netmonitor.o systemdmod.o log.o -lncurses
+	    $(CC) -o netmonitor netmonitor.o systemdmod.o log.o -lncurses -lpthread
 
 
 clean:

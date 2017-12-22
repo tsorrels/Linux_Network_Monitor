@@ -28,8 +28,8 @@ struct State{
     int currow;
     int numlines;
 
+    int outputstale;
     char lineoutput[MAXROW][MAXCOL];
-  
     char logbuffer[SIZELOGBUF];
 
     pid_t pidkill;
@@ -38,6 +38,7 @@ struct State{
 };
 
 
+#define SELECTTIMEOUT 2
 
 #define ERRSYSDSTOP 1
 #define ERRSYSDNAME 2
@@ -49,6 +50,13 @@ struct State{
 #define LOGERROR 0
 #define LOGEVENT 1
 
-
+/* systemdmod.c functions */
 int ismanaged(pid_t pid);
 int stopservice(pid_t pid);
+int getservicename(pid_t pid);
+
+/* log.c functions */
+int openlog();
+int writelog(int type, char* message);
+int closelog();
+

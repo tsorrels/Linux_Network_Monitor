@@ -8,7 +8,9 @@
 #include <sys/select.h>
 #include <unistd.h>
 #include <signal.h>
+#include <pthread.h>
 
+static pthread_mutex_t netstatmtx = PTHREAD_MUTEX_INITIALIZER;
 struct State state;
 void quit(int status);
 void initialize();
@@ -31,10 +33,12 @@ void initialize(){
     state.currow = state.header.numrows;
     state.curline = 0;
     state.paused = 0;
+    state.outputstale = 1;
     openlog();
     
     noecho();
     cbreak();
+    curs_set(0);
     clear();
     keypad(stdscr, TRUE);
 }
@@ -258,13 +262,32 @@ void readnetdev(){
 }
 
 
+static void * netstatthreadf(void *arg){
+    int checkerror;
+
+    checkerror = pthread_detach(pthread_self());
+    if (checkerror){
+	perror("Error detatching thread");
+    }
+
+
+    //writelines();
+    runnetstat();
+    pthread_mutex_lock(&netstatmtx);
+    state.outputstale = 0;
+    pthread_mutex_unlock(&netstatmtx);
+
+    pthread_exit(NULL);
+    return NULL;
+}
+
 void runnetstat(){
     FILE * pipe;
     char line[MAXCOL];
     int row;
     char * tmp;
 
-    pipe = popen("netstat -a -p --protocol inet 2>/dev/null", "r");
+    pipe = popen("netstat -a -n -p --protocol inet 2>/dev/null", "r");
     
     for (row = 0 ; row < MAXROW ; row ++){
 	tmp = fgets(line, MAXCOL, pipe);
@@ -279,7 +302,6 @@ void runnetstat(){
 
     if (state.currow >= row + state.header.numrows) 
 	state.currow = row + state.header.numrows - 1;
-
 
     pclose(pipe);    
 }
@@ -352,18 +374,28 @@ int main(int argc, char** argv)
     struct timeval timeout;
     int numfds;
 
+    pthread_t tid;
+    int checkerror;
+    
     initialize();
 
 
     readnetdev();
-    runnetstat();
-    display();
+    checkerror = pthread_create(&tid, NULL, netstatthreadf, NULL);
+    if(checkerror != 0){
+	/* handle error */
+	perror("Could not create thread");
+	quit(-1);
+    }
+
+    //runnetstat();
+    //display();
     
     FD_ZERO( &mask );
     FD_ZERO( &dummy_mask );
     FD_SET( STDIN_FILENO, &mask );
 
-    timeout.tv_sec = 2;
+    timeout.tv_sec = SELECTTIMEOUT;
     timeout.tv_usec = 0;
     
     while(1){
@@ -375,12 +407,29 @@ int main(int argc, char** argv)
 	}
 
 	else{
-	    if (state.paused == 1) continue;
-	    readnetdev();
-	    runnetstat();	    
-	    display();
-	    timeout.tv_sec = 2;
+	    /* reselt select timeout */
+	    timeout.tv_sec = SELECTTIMEOUT;
 	    timeout.tv_usec = 0;
+	    if (state.paused == 1) continue;
+	    //readnetdev();
+	    pthread_mutex_lock(&netstatmtx);
+	    /* check if an a thread has completed running netstat */
+	    if (state.outputstale == 0){
+		display();
+
+		/* start new thread */
+		checkerror = pthread_create(&tid, NULL, netstatthreadf, NULL);
+		if(checkerror != 0){
+		    /* handle error */
+		    perror("Could not create thread");
+		    quit(-1);
+		}
+		//runnetstat();	    
+		/* mark as stale */
+		state.outputstale = 1;		
+		/* present new data */
+	    }
+ 	    pthread_mutex_unlock(&netstatmtx);	    
 	}
     }
     
