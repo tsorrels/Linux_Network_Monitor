@@ -20,7 +20,7 @@ $ ./netmonitor
 
 ```
 
-![UI View](/doc/sock_terminal_view.jpeg)
+![UI View](/doc/sock_terminal_view.jpg)
 
 ##SystemD support:
 This program can kill processes managed by systemd. Daemons managed by systemd are terminated using the systemd 'stop' command.  If the processes is a service set to restart upon bootup the user can choose to disable the service to prevent restart. 
